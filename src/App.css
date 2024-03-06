@@ -1,0 +1,36 @@
+main {
+  text-align: center;
+  padding-top: 30px;
+}
+
+main button {
+  width: 90%;
+}
+
+main {
+  .export-btn {
+    height: 40px;
+    outline: none;
+    border: 1px solid;
+    border-color: rgb(20, 86, 240);
+    border-radius: 4px;
+    background-color: rgb(20, 86, 240);
+    color: #FFFFFF;
+    cursor: pointer;
+  }
+  
+  .tip {
+    color: red;
+    font-size: 13px;
+    text-align: left;
+    display: block;
+    margin-left: 5%;
+    margin-bottom: 10px;
+  }
+
+  .tip::before {
+    content: "*";
+    font-size: 14px;
+    margin-right: 3px;
+  }
+}
