@@ -17,6 +17,15 @@ type BaseResponse<DataType = unknown> = {
   data: DataType | null;
 };
 
+type TemplateTabConfig = {
+  name: string;
+  searchWord: string;
+  filterLabel?: {
+    material?: string;
+    color?: string;
+    style?: string;
+  };
+};
 export default function App() {
   const fileName = "templates_group_tabs.json";
   const process = async () => {
@@ -35,11 +44,20 @@ export default function App() {
     const textFields = fieldMetaList.filter(({ type }) => type === 1);
     const nameFieldMeta = textFields.find((field) => field.name.includes("name"));
     const searchWordFieldMeta = textFields.find((field) => field.name.includes("searchWord"));
-
+    const filterFieldsMeta = textFields.filter((field) => field.name.includes("filter"));
     if (!nameFieldMeta || !indexFieldMeta || !searchWordFieldMeta) return;
     const indexField = await table.getField<INumberField>(indexFieldMeta.id);
     const nameField = await table.getField<ITextField>(nameFieldMeta.id);
     const searchWordField = await table.getField<ITextField>(searchWordFieldMeta.id);
+    const filterFields: ITextField[] = await new Promise(async (resolve) => {
+      const list: ITextField[] = [];
+      for (const fieldMeta of filterFieldsMeta) {
+        const field = await table.getField<ITextField>(fieldMeta.id);
+        list.push(field);
+      }
+      resolve(list);
+    });
+
     if (!nameField || !indexField || !searchWordField) return;
 
     const recordIdList = await table.getRecordIdList();
@@ -56,7 +74,7 @@ export default function App() {
       .sort((a, b) => a.index - b.index);
     console.log("sortedRecordList: ", sortedRecordList);
 
-    const tabsData = [];
+    const tabsData: TemplateTabConfig[] = [];
     for (let i = 0; i < sortedRecordList.length; i++) {
       const { recordId } = sortedRecordList[i];
       const nameItem = await nameField.getCellString(recordId);
@@ -67,17 +85,32 @@ export default function App() {
           searchWord: searchWordItem,
         };
       }
+      for (const filterField of filterFields) {
+        const name = await filterField.getName();
+        const filterKey = name.split("-")[1];
+        const value = await filterField.getCellString(recordId);
+        if (value) {
+          const words = value.split(",");
+          console.log("words: ", words);
+          Object.assign(tabsData[i], {
+            filterLabel: {
+              ...(tabsData[i].filterLabel ?? {}),
+              [filterKey]: [value],
+            },
+          });
+        }
+      }
     }
 
     const json = { tabsData };
+    console.log("json: ", json);
     const jsonString = JSON.stringify(json);
 
     const ossPath = "/custom/ecoverse/";
 
     const { client: ossClient } = await createClient();
 
-    uploadJSON(jsonString, ossClient, fileName, ossPath)
-    .then((res) => {
+    uploadJSON(jsonString, ossClient, fileName, ossPath).then((res) => {
       console.log("uploaded", res);
 
       if (res.url && res.res.status === 200) {
