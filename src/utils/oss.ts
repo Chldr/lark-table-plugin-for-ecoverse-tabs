@@ -1,5 +1,7 @@
 import OSS from "ali-oss";
 import { ObjKeysCamelFormat } from "./variableName";
+import { aesCode, decryptAES, isJSON } from "./cryptoUtil";
+
 interface OSSConfigType {
   accessKeyId: string;
   accessKeySecret: string;
@@ -24,7 +26,7 @@ let clientConfig: OSSConfigType | null = null;
 let lastUpdateClientTime = 0;
 const api = (path: string) => `https://gw.nolibox.com/pixverse-telecom/${path}`;
 export const getOSSConfig = async () => {
-  const config = await fetch(api("oss/oss_token"))
+  const config = await fetch(api("oss/assume_role"))
     .then((res) => {
       if (res.ok) {
         return res.json();
@@ -33,8 +35,13 @@ export const getOSSConfig = async () => {
       }
     })
     .then((res: any) => {
-      const { data } = res as ResponseBase<OSSResponseData>;
+      const { data: dataStr } = res;
+      const decrypted = decryptAES(dataStr, aesCode);
+      const data = isJSON(decrypted) ? (JSON.parse(decrypted) as ResponseBase<OSSResponseData>) : null;
 
+      if (!data) {
+        return null;
+      }
       const {
         accessKeyId,
         accessKeySecret,
@@ -63,7 +70,7 @@ export const getOSSConfig = async () => {
   ];
 
   const ossConfig: any = ossKeys.reduce((options: Partial<OSSConfigType>, ossKey: keyof OSSConfigType) => {
-    options[ossKey] = config[ossKey];
+    options[ossKey] = config?.[ossKey];
     return options;
   }, {});
   return {
@@ -76,6 +83,7 @@ export const createClient = async () => {
   if (client && clientConfig && isNotExpired) return { client, config: clientConfig };
 
   const { ossConfig, config } = await getOSSConfig();
+
   client = new OSS({
     ...ossConfig,
     // yourRegion填写Bucket所在地域。以华东1（杭州）为例，Region填写为oss-cn-hangzhou。
